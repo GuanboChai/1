@@ -1,0 +1,229 @@
+
+import PyPDF2 
+import spacy
+import nltk
+import pyodbc
+import en_core_web_sm
+import cv2
+import pytesseract
+import pdfminer
+import matplotlib.pyplot as plt
+import pytds
+import pandas as pd
+
+from pdfminer.high_level import extract_text
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe'
+from PIL import Image
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize 
+from nltk.stem import PorterStemmer
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import wordnet
+from spacy import displacy
+from collections import Counter
+from pdf2image import convert_from_path
+
+
+
+
+#gloabl define
+email_check = 0
+phone_check = 0
+NAME = ''
+nlp = en_core_web_sm.load()
+words = []
+number_position = []
+name = "resume.pdf"
+list_area_code = ['205', '251', '256', '334', '938', '907', '480', '520', '602', '623', '928', '479', '501', '870',	'209', '213', '279', '310', '323', '408', '415', '424', '442', '510', '530', '559', 
+                  '562', '619', '626', '628', '650', '657', '661', '669', '707', '714', '747', '760', '805', '818', '820', '831', '858', '909', '916', '925', '949', '951', '303', '719', '720', '970', 
+                  '203', '475', '860', '959', '302', '239', '305', '321', '352', '386', '407', '561', '727', '754', '772', '786', '813', '850', '863', '904', '941', '954', '229', '404', '470', '478', 
+                  '678', '706', '762', '770', '912', '808', '208', '986', '217', '224', '309', '312', '331', '618', '630', '708', '773', '779', '815', '847', '872', '219', '260', '317', '463', '574', 
+                  '765', '812', '930', '319', '515', '563', '641', '712', '316', '620', '785', '913', '270', '364', '502', '606', '859', '225', '318', '337', '504', '985', '207', '240', '301', '410', 
+                  '443', '667', '339', '351', '413', '508', '617', '774', '781', '857', '978', '231', '248', '269', '313', '517', '586', '616', '734', '810', '906', '947', '989', '218', '320', '507', 
+                  '612', '651', '763', '952', '228', '601', '662', '769', '314', '417', '573', '636', '660', '816', '406', '308', '402', '531', '702', '725', '775', '603', '201', '551', '609', '640', 
+                  '732', '848', '856', '862', '908', '973', '505', '575', '212', '315', '332', '347', '516', '518', '585', '607', '631', '646', '680', '716', '718', '838', '845', '914', '917', '929', 
+                  '934', '252', '336', '704', '743', '828', '910', '919', '980', '984', '701', '216', '220', '234', '330', '380', '419', '440', '513', '567', '614', '740', '937', '405', '539', '580', 
+                  '918', '458', '503', '541', '971', '215', '223', '267', '272', '412', '445', '484', '570', '610', '717', '724', '814', '878', '401', '803', '843', '854', '864', '605', '423', '615', 
+                  '629', '731', '865', '901', '931', '210', '214', '254', '281', '325', '346', '361', '409', '430', '432', '469', '512', '682', '713', '726', '737', '806', '817', '830', '832', '903', 
+                  '915', '936', '940', '956', '972', '979', '385', '435', '801', '802', '276', '434', '540', '571', '703', '757', '804', '206', '253', '360', '425', '509', '564', '202', '304', '681', 
+                  '262', '414', '534', '608', '715', '920', '307', '684', '671', '670', '787', '939', '340']
+#functions:
+def PDFpage():                      #return number of pages in the PDF file
+    Num_page = pdfReader.numPages
+    print("PDF reading finish") 
+    return (Num_page)
+def PDFloading(pageNumber):         #load all texts from the PDF file
+    i = 0
+    while i < pageNumber:           
+        pageObj = pdfReader.getPage(i)
+        sentence = pageObj.extractText()
+        print("PDF loading finish") 
+        i += 1
+    return (sentence)
+def stopWords(text):                #delet all stop words
+    filtered_sentence = []
+    stop_words = set(stopwords.words('english')) 
+    word_tokens = word_tokenize(text) 
+    for w in word_tokens: 
+        if w not in stop_words: 
+            filtered_sentence.append(w) 
+    return (filtered_sentence)
+def stemWords(filtered_sentece):    #only keep word stems in the sentence (not utilizing)
+    stem_words = []
+    ps = PorterStemmer()
+    for w in filtered_sentence:
+        rootWord=ps.stem(w)
+        stem_words.append(rootWord)
+    return (stem_words)
+def lemmatization(filtered_sentece): #lemmatization
+    lemma_word = []
+    wordnet_lemmatizer = WordNetLemmatizer()
+    for w in filtered_sentence:
+        word1 = wordnet_lemmatizer.lemmatize(w, pos = "n")
+        word2 = wordnet_lemmatizer.lemmatize(word1, pos = "v")
+        word3 = wordnet_lemmatizer.lemmatize(word2, pos = ("a"))
+        lemma_word.append(word3)
+    return (lemma_word)
+def punctuation(lemma_word):
+    clean_text = []
+    clean_list = []
+    tokenizer = nltk.RegexpTokenizer(r"\w+")
+    for i in lemma_word:
+        cleanWord = tokenizer.tokenize(i)
+        clean_list.append(cleanWord)
+    for i in clean_list:
+        clean_text += i
+    return clean_text
+
+
+
+
+###### Open the PDF file and set up writing file
+set(stopwords.words('english'))
+pdfFileObj = open(name, 'rb') 
+file = open("MyFile.txt","a")
+file.truncate(0)
+pdfReader = PyPDF2.PdfFileReader(pdfFileObj) 
+######
+pageNumber = PDFpage()
+text = extract_text(name)
+email = ''
+b = 0
+
+PersonalInformationSection = text[0:100].lower()
+#NER
+doc = nlp(text)  # this parameter contains all property information
+PER_DOC = nlp(PersonalInformationSection)
+print([(X.text, X.label_) for X in doc.ents])
+for x in PER_DOC.ents:
+    if x.label_ == 'PERSON':
+        NAME = x.text
+
+
+for x in doc.ents:
+    if x.label_ != 'PERSON' and x.label_ != 'DATE' and x.label_ != 'CARDINAL':
+        file.write(x.text.replace("\n", "")+' ')
+file.write('\n')
+file.write('\n')
+##############
+
+########
+print("text cleaning begin") 
+filtered_sentence = stopWords(text)
+count = 0
+#Find email address
+email = 0
+for i in filtered_sentence:
+    if i == "@" and email_check == 0:
+        email = filtered_sentence[count-1]+filtered_sentence[count]+filtered_sentence[count+1]
+        email_check = 1
+    count += 1
+
+
+########## 
+
+lemma_word = lemmatization(text)
+
+
+cleantext = punctuation(lemma_word)
+nospace = ''.join(cleantext)
+count = 0
+for i in cleantext:
+    file.write(i+" ")
+    for x in i:
+        try:
+            num_1 = int(x)
+            count_num += 1
+        except:
+            i = i
+    count += 1
+   
+
+###### Find phone number
+nospace.replace(' ','')
+
+for i in list_area_code:
+    status = (nospace.find(i))
+    if(status != -1):
+        number_position.append(status)
+
+
+for i in number_position :
+    check_a = nospace[i-1] in ['1','2','3','4','5','6','7','8','9','0']
+    check_b = nospace[i+9] in ['1','2','3','4','5','6','7','8','9','0']
+    check_c = nospace[i+10] in ['1','2','3','4','5','6','7','8','9','0']
+  
+    if  (not check_a) and check_b and (not check_c) :
+        phone_check = 1
+        digit = int(i)
+        break
+    else:
+        digit = -1
+if digit != -1:
+    is_phonenumber = 1
+else:
+    is_phonenumber = 0
+
+if is_phonenumber == 1:
+    phone_number = nospace[digit:digit+10]
+else:
+    phone_number = 0
+
+is_GPA = 0
+digit_GPA = nospace.find('GPA')
+if digit_GPA != -1:  
+    is_GPA = 1
+
+
+if is_GPA == 1:
+    GPA = nospace[digit_GPA+3] + '.'+ nospace[digit_GPA+4:digit_GPA+6]
+else:
+    GPA = 0
+
+file.write("\n")
+
+
+
+file.write("\n")
+file.write(NAME.replace("\n", ""))
+file.write("\n")
+file.write(GPA)
+file.write("\n")
+file.write(phone_number)
+file.write("\n")
+file.write(email)
+file.write("\n")
+file.close()
+
+#for i in steam_words:
+#   print(i+'\n')
+#connect_string = ''
+try: 
+    con = pytds.connect(server = '172.20.10.4',database = 'TBDraft', user = 'admin1',password = 'TBuilder')
+    print("connected")
+except pytds.Error as ex:
+    print("failed to connect")
+
+#df = pd.DataFrame( columns = ['ID', 'Processed Resume'])
+#df2 = pd.read_sql_query("SELECT ALL * FROM TrainingResumes",1)
+#print(df2)
